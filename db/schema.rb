@@ -10,7 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2021_03_17_104454) do
+ActiveRecord::Schema.define(version: 2021_03_17_105551) do
+
+  create_table "foods", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "price", null: false
+    t.text "description", null: false
+    t.bigint "restaurant_id", null: false
+    t.index ["restaurant_id"], name: "index_foods_on_restaurant_id"
+  end
 
   create_table "restaurants", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
     t.string "name", null: false
@@ -20,4 +28,5 @@ ActiveRecord::Schema.define(version: 2021_03_17_104454) do
     t.datetime "updated_at", precision: 6, null: false
   end
 
+  add_foreign_key "foods", "restaurants"
 end
