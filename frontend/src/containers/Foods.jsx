@@ -1,25 +1,33 @@
-import React, {Fragment, useEffect, useReducer, useState} from 'react';
+import React, { Fragment,  useReducer, useEffect ,useState } from 'react';
 import styled from 'styled-components';
-import {Link} from "react-router-dom";
-//api
-import {fetchFoods} from '../apis/foods';
-//reducers
+import { useHistory, Link } from "react-router-dom";
+
+// components
+import { LocalMallIcon } from '../components/Icons';
+import { FoodWrapper } from '../components/FoodWrapper';
+import { NewOrderConfirmDialog } from '../components/NewOrderConfirmDialog';
+import Skeleton from '@material-ui/lab/Skeleton';
+
+// reducers
 import {
   initialState as foodsInitialState,
   foodsActionTypes,
   foodsReducer,
 } from '../reducers/foods';
-//constants
-import {REQUEST_STATE} from '../constants';
-import { COLORS } from '../style_constants';
-// components
-import { LocalMallIcon } from '../components/Icons';
-import { FoodWrapper } from '../components/FoodWrapper';
-import Skeleton from '@material-ui/lab/Skeleton';
-import { FoodOrderDialog } from '../components/FoodOrderDialog';
+
+// apis
+import { fetchFoods } from '../apis/foods';
+import { postLineFoods, replaceLineFoods } from '../apis/line_foods';
+
 // images
 import MainLogo from '../images/logo.png';
+import { FoodOrderDialog } from '../components/FoodOrderDialog';
 import FoodImage from '../images/food-image.jpg';
+
+// constants
+import { HTTP_STATUS_CODE } from '../constants';
+import { COLORS } from '../style_constants';
+import { REQUEST_STATE } from '../constants';
 
 const HeaderWrapper = styled.div`
   display: flex;
@@ -37,7 +45,7 @@ const ColoredBagIcon = styled(LocalMallIcon)`
 
 const MainLogoImage = styled.img`
   height: 90px;
-`;
+`
 
 const FoodsList = styled.div`
   display: flex;
@@ -50,29 +58,60 @@ const ItemWrapper = styled.div`
   margin: 16px;
 `;
 
-const submitOrder = () => {
-  console.log('登録ボタンが押された！');
-};
-
-export const Foods = ({match}) => {
-  const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
-
+export const Foods = ({
+  match
+}) => {
   const initialState = {
     isOpenOrderDialog: false,
     selectedFood: null,
     selectedFoodCount: 1,
-  }
+    isOpenNewOrderDialog: false,
+    existingRestaurantName: '',
+    newRestaurantName: '',
+  };
   const [state, setState] = useState(initialState);
+  const [foodsState, dispatch] = useReducer(foodsReducer, foodsInitialState);
+  const history = useHistory();
 
   useEffect(() => {
+    dispatch({ type: foodsActionTypes.FETCHING });
     fetchFoods(match.params.restaurantsId)
-    .then((data) => {
-      dispatch({
-        type: foodsActionTypes.FETCH_SUCCESS,
-        payload: {foods: data.foods}
-      });
-    })
-  }, [])
+      .then((data) => {
+        dispatch({
+          type: foodsActionTypes.FETCH_SUCCESS,
+          payload: {
+            foods: data.foods
+          }
+        });
+      })
+  }, []);
+
+  const submitOrder = () => {
+    postLineFoods({
+      foodId: state.selectedFood.id,
+      count: state.selectedFoodCount,
+    }).then(() => history.push('/orders'))
+      .catch((e) => {
+        if (e.response.status === HTTP_STATUS_CODE.NOT_ACCEPTABLE) {
+          setState({
+            ...state,
+            isOpenOrderDialog: false,
+            isOpenNewOrderDialog: true,
+            existingRestaurantName: e.response.data.existing_restaurant,
+            newRestaurantName: e.response.data.new_restaurant,
+          })
+        } else {
+          throw e;
+        }
+      })
+  };
+
+  const replaceOrder = () => {
+    replaceLineFoods({
+      foodId: state.selectedFood.id,
+      count: state.selectedFoodCount,
+    }).then(() => history.push('/orders'))
+  }
 
   return (
     <Fragment>
@@ -103,11 +142,12 @@ export const Foods = ({match}) => {
               <ItemWrapper key={food.id}>
                 <FoodWrapper
                   food={food}
-                  onClickFoodWrapper={(food) => setState({
-                    ...state,
-                    isOpenOrderDialog: true,
-                    selectedFood: food,
-                  })
+                  onClickFoodWrapper={
+                    (food) => setState({
+                      ...state,
+                      selectedFood: food,
+                      isOpenOrderDialog: true,
+                    })
                   }
                   imageUrl={FoodImage}
                 />
@@ -136,6 +176,16 @@ export const Foods = ({match}) => {
             selectedFood: null,
             selectedFoodCount: 1,
           })}
+        />
+      }
+      {
+        state.isOpenNewOrderDialog &&
+        <NewOrderConfirmDialog
+          isOpen={state.isOpenNewOrderDialog}
+          onClose={() => setState({ ...state, isOpenNewOrderDialog: false })}
+          existingRestaurantName={state.existingRestaurantName}
+          newRestaurantName={state.newRestaurantName}
+          onClickSubmit={() => replaceOrder()}
         />
       }
     </Fragment>
